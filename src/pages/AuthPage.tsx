@@ -173,7 +173,11 @@ export default function AuthPage() {
 
   function startSession() {
     setPhase('active')
-    vidlive.startDetection(deviceId)
+    
+    // Defer startDetection to ensure React has mounted the video element
+    setTimeout(() => {
+      vidlive.startDetection(deviceId)
+    }, 100)
 
     addTimer(() => {
       setCurrentInstruction(INSTRUCTIONS[0].text)
@@ -291,10 +295,11 @@ export default function AuthPage() {
 
                 <Button
                   className="w-full text-white font-semibold h-12 text-base"
-                  style={{ backgroundColor: '#C8102E', border: 'none' }}
+                  style={{ backgroundColor: vidlive.isLoaded ? '#C8102E' : '#9CA3AF', border: 'none' }}
                   onClick={startSession}
+                  disabled={!vidlive.isLoaded}
                 >
-                  Begin Authentication →
+                  {vidlive.isLoaded ? 'Begin Authentication →' : 'Loading DeepShield Engine...'}
                 </Button>
 
                 <Button
