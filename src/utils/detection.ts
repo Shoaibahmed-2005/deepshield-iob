@@ -101,9 +101,10 @@ export function calcReactionScore(
 
   // Enrolled profile — compare deviation from baseline
   const deviation = Math.abs(reactionMs - enrolledMeanMs)
-  if (deviation < 120) return 95
-  if (deviation < 250) return 70
-  if (deviation < 400) return 40
+  // Human reaction to a screen prompt can naturally vary. Loosening these constraints:
+  if (deviation < 300) return 95
+  if (deviation < 500) return 75
+  if (deviation < 700) return 40
   return 15
 }
 
@@ -119,19 +120,19 @@ export function calcParallaxScore(
     yawRatioHistory.reduce((acc, v) => acc + (v - mean) ** 2, 0) / yawRatioHistory.length
 
   let score: number
-  if (variance > 0.015) {
-    score = 90
-  } else if (variance > 0.008) {
-    score = 75
-  } else if (variance > 0.003) {
-    score = 50
+  if (variance > 0.010) {
+    score = 95
+  } else if (variance > 0.005) {
+    score = 80
+  } else if (variance > 0.002) {
+    score = 60
   } else {
-    score = 20
+    score = 30
   }
 
   // Penalise if mean yaw deviates too much from enrolled baseline
-  if (Math.abs(mean - enrolledYawMean) > 0.2) {
-    score = Math.max(0, score - 20)
+  if (Math.abs(mean - enrolledYawMean) > 0.25) {
+    score = Math.max(0, score - 15)
   }
 
   return Math.max(0, Math.min(100, score))

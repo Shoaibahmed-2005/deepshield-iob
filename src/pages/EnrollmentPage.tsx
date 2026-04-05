@@ -75,7 +75,10 @@ export default function EnrollmentPage() {
   // Start camera and enrollment sequence when capture phase begins
   useEffect(() => {
     if (phase !== 'capture') return
-    vidlive.startDetection()
+    // Allow DOM to mount video element before starting detection
+    setTimeout(() => {
+      vidlive.startDetection()
+    }, 100)
     runEnrollmentSequence()
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current)
@@ -248,10 +251,11 @@ export default function EnrollmentPage() {
 
                 <Button
                   className="w-full text-white font-semibold h-12 text-base"
-                  style={{ backgroundColor: '#C8102E', border: 'none' }}
+                  style={{ backgroundColor: vidlive.isLoaded ? '#C8102E' : '#9CA3AF', border: 'none' }}
                   onClick={() => setPhase('capture')}
+                  disabled={!vidlive.isLoaded}
                 >
-                  Begin Enrollment →
+                  {vidlive.isLoaded ? 'Begin Enrollment →' : 'Loading DeepShield Engine...'}
                 </Button>
               </div>
             </CardContent>
