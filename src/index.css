@@ -9,33 +9,33 @@
 }
 
 :root {
-  --iob-red: #C8102E;
-  --iob-navy: #003087;
-  --iob-gold: #FFD700;
-  --iob-bg: #F4F6F9;
-  --iob-success: #16A34A;
-  --iob-warning: #D97706;
-  --iob-danger: #DC2626;
+  --iob-red: #c8102e;
+  --iob-navy: #0f3e92;
+  --iob-gold: #f7c948;
+  --iob-bg: #eef5ff;
+  --iob-success: #15803d;
+  --iob-warning: #b45309;
+  --iob-danger: #dc2626;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: #eef5ff;
+  --foreground: #142849;
+  --card: #ffffff;
+  --card-foreground: #1e365f;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: #1e365f;
+  --primary: #0f3e92;
+  --primary-foreground: #ffffff;
+  --secondary: #e7efff;
+  --secondary-foreground: #193d80;
+  --muted: #ecf2ff;
+  --muted-foreground: #6078a3;
+  --accent: #f4f8ff;
+  --accent-foreground: #184080;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --border: #d8e4fb;
+  --input: #d4e0f5;
+  --ring: #0f3e92;
+  --radius: 1rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -84,6 +84,44 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen bg-gradient-to-b from-[#eef5ff] via-[#f4f8ff] to-[#edf4ff];
+  }
+
+  .premium-card {
+    @apply rounded-2xl border border-[#d6e2fa] bg-white shadow-[0_10px_28px_rgba(15,62,146,0.08)];
+  }
+
+  .soft-glass {
+    @apply rounded-2xl border border-white/30 bg-white/45 backdrop-blur-md;
+  }
+
+  .security-kpi {
+    @apply rounded-xl border border-[#d7e2fb] bg-[#f8fbff] px-3 py-2;
+  }
+
+  .section-title {
+    @apply text-2xl font-semibold tracking-tight text-[#103b88] md:text-3xl;
+  }
+
+  .section-subtitle {
+    @apply text-sm text-[#5e759f] md:text-base;
+  }
+
+  .status-good {
+    @apply text-emerald-700;
+  }
+
+  .status-warn {
+    @apply text-amber-700;
+  }
+
+  .status-bad {
+    @apply text-rose-700;
   }
 }

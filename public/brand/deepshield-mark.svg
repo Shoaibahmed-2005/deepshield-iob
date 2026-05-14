@@ -1,0 +1,23 @@
+<svg width="144" height="144" viewBox="0 0 144 144" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldBg" x1="22" y1="18" x2="122" y2="130" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0C3F93" />
+      <stop offset="1" stop-color="#0A61C8" />
+    </linearGradient>
+    <linearGradient id="meshLine" x1="35" y1="24" x2="94" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4DD0FF" />
+      <stop offset="1" stop-color="#7EE0FF" />
+    </linearGradient>
+  </defs>
+  <path d="M72 9L114 24C116.9 25.1 119 27.9 119 31V67C119 97.5 98.5 124.4 72 133C45.5 124.4 25 97.5 25 67V31C25 27.9 27.1 25.1 30 24L72 9Z" fill="url(#shieldBg)" />
+  <path d="M72 22V121" stroke="#70E1FF" stroke-width="3.5" stroke-linecap="round" />
+  <path d="M37 46L58 33L72 43L52 58L37 46Z" stroke="url(#meshLine)" stroke-width="3" />
+  <path d="M52 58L72 43L72 66L54 74L52 58Z" stroke="url(#meshLine)" stroke-width="3" />
+  <path d="M54 74L72 66L72 89L58 102L47 90L54 74Z" stroke="url(#meshLine)" stroke-width="3" />
+  <path d="M37 70L52 58L54 74L40 83L37 70Z" stroke="url(#meshLine)" stroke-width="3" />
+  <path d="M40 83L54 74L47 90L33 95L40 83Z" stroke="url(#meshLine)" stroke-width="3" />
+  <path d="M72 43L92 33L106 45L92 58L72 66V43Z" stroke="#30B8FF" stroke-width="3" />
+  <path d="M72 66L92 58L104 71L92 83L72 89V66Z" stroke="#30B8FF" stroke-width="3" />
+  <path d="M72 89L92 83L104 95L90 106L72 121V89Z" stroke="#30B8FF" stroke-width="3" />
+  <path d="M96 24C111 28.3 122 44.4 122 60.4V66.1C122 102.8 98.2 130.8 72 139.2C45.8 130.8 22 102.8 22 66.1V60.4C22 44.4 33 28.3 48 24" stroke="#74E4FF" stroke-width="2.5" opacity="0.5" />
+</svg>

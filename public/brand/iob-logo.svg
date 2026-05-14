@@ -1,0 +1,16 @@
+<svg width="312" height="84" viewBox="0 0 312 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iobBlue" x1="12" y1="8" x2="69" y2="72" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E4E9D" />
+      <stop offset="1" stop-color="#0A2D78" />
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M40.5 8L66.5 21.8V47.6L40.5 61.4L14.5 47.6V21.8L40.5 8Z" stroke="url(#iobBlue)" stroke-width="4" />
+    <path d="M40.5 18L56.8 26.7V42.7L40.5 51.4L24.2 42.7V26.7L40.5 18Z" stroke="url(#iobBlue)" stroke-width="3.5" />
+    <path d="M40.5 28L47.2 31.6V38.8L40.5 42.4L33.8 38.8V31.6L40.5 28Z" fill="#0A2D78" />
+    <path d="M12 58.5L40.5 74L69 58.5" stroke="#7FAEEA" stroke-width="3" stroke-linecap="round" />
+  </g>
+  <text x="86" y="38" fill="#0A2D78" font-size="30" font-weight="700" font-family="Poppins, Arial, sans-serif">Indian Overseas Bank</text>
+  <text x="86" y="60" fill="#6B83B5" font-size="12.5" font-weight="500" font-family="Poppins, Arial, sans-serif">Good People to Grow With</text>
+</svg>

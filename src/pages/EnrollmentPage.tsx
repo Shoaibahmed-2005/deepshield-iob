@@ -1,58 +1,31 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import {
+  CheckCircle2,
+  LoaderCircle,
+  ShieldCheck,
+  Sparkles,
+  UserRoundCheck,
+} from 'lucide-react'
 import { useVidLive } from '@/hooks/useVidLive'
 import { useProfile } from '@/store/userProfile'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { PageShell } from '@/components/layout/PageShell'
+import { fadeInUp, hoverLift } from '@/lib/motion'
 
-// ── IOB DeepShield Header ────────────────────────────────────────────────────
-function IOBHeader() {
-  return (
-    <div>
-      <div
-        style={{ backgroundColor: '#003087' }}
-        className="flex items-center justify-between px-6 py-3"
-      >
-        <div className="flex items-center gap-4">
-          <div>
-            <div className="text-white font-bold text-2xl leading-none">IOB</div>
-            <div className="text-white text-xs opacity-80">Indian Overseas Bank</div>
-          </div>
-          <div style={{ width: 1, height: 40, backgroundColor: '#FFD700', opacity: 0.8 }} />
-          <div className="flex items-center gap-2">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4z"
-                fill="#C8102E"
-                stroke="#C8102E"
-                strokeWidth="1"
-              />
-              <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span style={{ color: '#C8102E', fontWeight: 700, fontSize: 18 }}>DeepShield</span>
-          </div>
-        </div>
-        <div style={{ color: '#FFD700', fontStyle: 'italic', fontSize: 13, fontWeight: 400 }}>
-          Good People to Grow With
-        </div>
-      </div>
-      <div style={{ height: 3, backgroundColor: '#C8102E' }} />
-    </div>
-  )
-}
-
-// ── Steps data ───────────────────────────────────────────────────────────────
 const STEPS = [
-  { label: 'Baseline Capture', instruction: 'Look straight at the camera — stay still' },
-  { label: 'Turn Left', instruction: 'Slowly turn your head to the LEFT' },
-  { label: 'Turn Right', instruction: 'Slowly turn your head to the RIGHT' },
-  { label: 'Blink Detection', instruction: 'Blink twice slowly' },
-  { label: 'Complete Profile', instruction: 'Almost done — hold still' },
+  { label: 'Face Alignment', instruction: 'Look straight at the camera and stay still.' },
+  { label: 'Turn Left', instruction: 'Turn your head to the left slowly.' },
+  { label: 'Turn Right', instruction: 'Turn your head to the right slowly.' },
+  { label: 'Live Response', instruction: 'Follow the blink prompt naturally.' },
+  { label: 'Stability Check', instruction: 'Hold still for final secure baseline.' },
 ]
 
-const STEP_DURATION = 4000 // 4 seconds per step
+const STEP_DURATION = 4000
 
 export default function EnrollmentPage() {
   const navigate = useNavigate()
@@ -64,24 +37,21 @@ export default function EnrollmentPage() {
   const [countdown, setCountdown] = useState(100)
   const [completedSteps, setCompletedSteps] = useState<boolean[]>([false, false, false, false, false])
 
-  // Local enrollment data refs
   const baselineLandmarks = useRef<number[]>([])
   const baselineYaw = useRef<number>(1.0)
   const reactionSamples = useRef<number[]>([])
-
-  // Countdown timer per step
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Start camera and enrollment sequence when capture phase begins
   useEffect(() => {
     if (phase !== 'capture') return
-    // Allow DOM to mount video element before starting detection
     setTimeout(() => {
       vidlive.startDetection()
-    }, 100)
+    }, 120)
     runEnrollmentSequence()
+
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current)
+      vidlive.stopDetection()
     }
   }, [phase])
 
@@ -93,28 +63,28 @@ export default function EnrollmentPage() {
       const elapsed = Date.now() - start
       const pct = Math.max(0, 100 - (elapsed / durationMs) * 100)
       setCountdown(Math.round(pct))
-    }, 50)
+    }, 40)
   }
 
   function runEnrollmentSequence() {
     reactionSamples.current = []
+    setCompletedSteps([false, false, false, false, false])
 
-    // Step 1: Baseline (0–4s)
     setStepIndex(0)
     startCountdown(STEP_DURATION)
 
     setTimeout(() => {
-      // t=2s: record baseline
-      if (vidlive.videoRef.current) {
-        baselineLandmarks.current = [] // will be captured via yaw
-      }
+      if (vidlive.videoRef.current) baselineLandmarks.current = []
       baselineYaw.current = vidlive.yawRatio
     }, 2000)
 
-    // Step 2: Turn Left (4–8s)
     setTimeout(() => {
       setStepIndex(1)
-      setCompletedSteps((prev) => { const n = [...prev]; n[0] = true; return n })
+      setCompletedSteps((prev) => {
+        const next = [...prev]
+        next[0] = true
+        return next
+      })
       startCountdown(STEP_DURATION)
       vidlive.recordReactionTime()
     }, STEP_DURATION)
@@ -123,10 +93,13 @@ export default function EnrollmentPage() {
       if (vidlive.reactionTimeMs !== null) reactionSamples.current.push(vidlive.reactionTimeMs)
     }, STEP_DURATION * 2)
 
-    // Step 3: Turn Right (8–12s)
     setTimeout(() => {
       setStepIndex(2)
-      setCompletedSteps((prev) => { const n = [...prev]; n[1] = true; return n })
+      setCompletedSteps((prev) => {
+        const next = [...prev]
+        next[1] = true
+        return next
+      })
       startCountdown(STEP_DURATION)
       vidlive.recordReactionTime()
     }, STEP_DURATION * 2)
@@ -135,10 +108,13 @@ export default function EnrollmentPage() {
       if (vidlive.reactionTimeMs !== null) reactionSamples.current.push(vidlive.reactionTimeMs)
     }, STEP_DURATION * 3)
 
-    // Step 4: Blink (12–16s)
     setTimeout(() => {
       setStepIndex(3)
-      setCompletedSteps((prev) => { const n = [...prev]; n[2] = true; return n })
+      setCompletedSteps((prev) => {
+        const next = [...prev]
+        next[2] = true
+        return next
+      })
       startCountdown(STEP_DURATION)
       vidlive.recordReactionTime()
     }, STEP_DURATION * 3)
@@ -147,20 +123,22 @@ export default function EnrollmentPage() {
       if (vidlive.reactionTimeMs !== null) reactionSamples.current.push(vidlive.reactionTimeMs)
     }, STEP_DURATION * 4)
 
-    // Step 5: Hold still (16–19s)
     setTimeout(() => {
       setStepIndex(4)
-      setCompletedSteps((prev) => { const n = [...prev]; n[3] = true; return n })
+      setCompletedSteps((prev) => {
+        const next = [...prev]
+        next[3] = true
+        return next
+      })
       startCountdown(3000)
     }, STEP_DURATION * 4)
 
-    // t=19s: finalize profile
     setTimeout(() => {
       setCompletedSteps([true, true, true, true, true])
       if (countdownRef.current) clearInterval(countdownRef.current)
       setCountdown(0)
 
-      const samples = reactionSamples.current.filter((s) => s > 0)
+      const samples = reactionSamples.current.filter((sample) => sample > 0)
       const meanMs =
         samples.length > 0
           ? Math.round(samples.reduce((a, b) => a + b, 0) / samples.length)
@@ -180,311 +158,232 @@ export default function EnrollmentPage() {
     }, STEP_DURATION * 4 + 3000)
   }
 
-  // ── RENDER: WELCOME ──────────────────────────────────────────────────────
   if (phase === 'welcome') {
     return (
-      <div style={{ backgroundColor: '#F4F6F9', minHeight: '100vh' }}>
-        <IOBHeader />
-        <div className="flex items-center justify-center py-12 px-4">
-          <Card className="w-full max-w-lg shadow-xl border-0">
-            <CardContent className="pt-8 pb-8">
-              <div className="flex flex-col items-center text-center gap-6">
-                {/* Shield Icon */}
-                <div
-                  className="rounded-full flex items-center justify-center"
-                  style={{ width: 80, height: 80, backgroundColor: '#FEE2E2' }}
-                >
-                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4z"
-                      fill="#C8102E"
-                      stroke="#C8102E"
-                      strokeWidth="1"
-                    />
-                    <path
-                      d="M9 12l2 2 4-4"
-                      stroke="white"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+      <PageShell backTo="/" backLabel="Home">
+        <div className="mx-auto flex w-full max-w-5xl justify-center px-4 py-10 sm:px-6 lg:px-8">
+          <motion.div className="w-full max-w-2xl" {...fadeInUp}>
+            <Card className="premium-card border-0">
+              <CardContent className="space-y-6 pt-8 pb-8">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl bg-[#e6efff] p-3 text-[#0f3e92]">
+                    <ShieldCheck className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-semibold text-[#0f3f92]">DeepShield Enrollment</h1>
+                    <p className="text-sm text-[#5f79a4]">
+                      Create your secure identity profile in under 20 seconds.
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h1
-                    className="text-2xl font-bold mb-2"
-                    style={{ color: '#003087', fontFamily: 'Poppins, sans-serif' }}
-                  >
-                    DeepShield Biometric Enrollment
-                  </h1>
-                  <p className="text-gray-500 text-sm">
-                    Secure your IOB account with AI-powered liveness detection
-                  </p>
-                </div>
-
-                <div className="w-full border-t border-gray-200" />
-
-                <div className="w-full text-left">
-                  <p className="font-semibold text-gray-800 mb-3">What happens during enrollment:</p>
-                  <ul className="space-y-2">
+                <div className="rounded-2xl border border-[#d8e3fb] bg-[#f7faff] p-4">
+                  <p className="mb-3 text-sm font-medium text-[#2d548f]">What happens during enrollment</p>
+                  <div className="grid gap-2 text-sm text-[#5f7aa6]">
                     {[
-                      '20-second guided video session',
-                      'Facial movement patterns analyzed',
-                      'Mathematical profile created (no video stored)',
-                      'Profile used to detect deepfakes on future logins',
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                        <span style={{ color: '#16A34A', fontWeight: 700 }}>✓</span>
-                        {item}
-                      </li>
+                      'Guided face capture with clear instructions',
+                      'Movement and response timing baseline creation',
+                      'On-device scoring for secure future verification',
+                      'No raw video is stored after completion',
+                    ].map((line) => (
+                      <div key={line} className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span>{line}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full rounded-lg p-3" style={{ backgroundColor: '#F0FDF4' }}>
-                  <span>🔒</span>
-                  <p className="text-xs text-gray-500">
-                    Your biometric data never leaves this device
-                  </p>
+                <div className="security-kpi flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-[#d29a20]" />
+                  <p className="text-sm text-[#385a8f]">Keep your face clearly visible for best accuracy.</p>
                 </div>
 
-                <Button
-                  className="w-full text-white font-semibold h-12 text-base"
-                  style={{ backgroundColor: vidlive.isLoaded ? '#C8102E' : '#9CA3AF', border: 'none' }}
-                  onClick={() => setPhase('capture')}
-                  disabled={!vidlive.isLoaded}
-                >
-                  {vidlive.isLoaded ? 'Begin Enrollment →' : 'Loading DeepShield Engine...'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    variant="brand"
+                    size="lg"
+                    className="w-full"
+                    onClick={() => setPhase('capture')}
+                    disabled={!vidlive.isLoaded}
+                  >
+                    {vidlive.isLoaded ? 'Begin Enrollment' : 'Initializing Engine'}
+                  </Button>
+                  <Button variant="outline" size="lg" className="w-full" onClick={() => navigate('/auth')}>
+                    Skip to Authentication
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
-  // ── RENDER: SUCCESS ──────────────────────────────────────────────────────
   if (phase === 'success') {
     return (
-      <div style={{ backgroundColor: '#F4F6F9', minHeight: '100vh' }}>
-        <IOBHeader />
-        <div className="flex items-center justify-center py-12 px-4">
-          <Card className="w-full max-w-md shadow-xl border-0">
-            <CardContent className="pt-8 pb-8">
-              <div className="flex flex-col items-center text-center gap-5">
-                {/* Animated checkmark */}
-                <svg width="80" height="80" viewBox="0 0 80 80">
-                  <circle
-                    cx="40"
-                    cy="40"
-                    r="36"
-                    fill="none"
-                    stroke="#16A34A"
-                    strokeWidth="4"
-                    strokeDasharray="226"
-                    strokeDashoffset="0"
-                    style={{ transition: 'stroke-dashoffset 0.8s ease' }}
-                  />
-                  <path
-                    d="M24 40 L35 52 L56 30"
-                    fill="none"
-                    stroke="#16A34A"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray="50"
-                    strokeDashoffset="0"
-                    style={{
-                      animation: 'checkDraw 0.8s ease forwards 0.3s',
-                    }}
-                  />
-                </svg>
-
-                <style>{`
-                  @keyframes checkDraw {
-                    from { stroke-dashoffset: 50; }
-                    to { stroke-dashoffset: 0; }
-                  }
-                `}</style>
-
-                <h2 className="text-xl font-bold" style={{ color: '#16A34A' }}>
-                  Profile Created Successfully!
-                </h2>
-                <p className="text-gray-500 text-sm">Your DeepShield profile is now active</p>
-
-                <div
-                  className="w-full rounded-lg p-3 text-sm font-mono text-center"
-                  style={{ backgroundColor: '#F3F4F6', color: '#374151' }}
-                >
-                  Profile ID: {profile.userId || 'IOB_' + Date.now()}
+      <PageShell backTo="/" backLabel="Home">
+        <div className="mx-auto flex w-full max-w-5xl justify-center px-4 py-10 sm:px-6 lg:px-8">
+          <motion.div className="w-full max-w-xl" {...fadeInUp}>
+            <Card className="premium-card border-0">
+              <CardContent className="space-y-6 pt-8 pb-8 text-center">
+                <div className="mx-auto rounded-full bg-emerald-100 p-4 text-emerald-700">
+                  <UserRoundCheck className="h-10 w-10" />
                 </div>
-
-                <div className="flex gap-3 w-full">
-                  <Button
-                    className="flex-1 text-white font-semibold"
-                    style={{ backgroundColor: '#C8102E', border: 'none' }}
-                    onClick={() => navigate('/auth')}
-                  >
-                    Test Authentication →
+                <div>
+                  <h2 className="text-2xl font-semibold text-emerald-700">Profile Enrollment Complete</h2>
+                  <p className="mt-2 text-sm text-[#5f79a4]">
+                    Your secure verification baseline is ready for authentication.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#d8e3fb] bg-[#f7faff] p-3 text-sm text-[#43659a]">
+                  Profile ID: <span className="font-semibold">{profile.userId}</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button variant="brand" size="lg" className="w-full" onClick={() => navigate('/auth')}>
+                    Start Authentication
                   </Button>
-                  <Button
-                    className="flex-1 text-white font-semibold"
-                    style={{ backgroundColor: '#003087', border: 'none' }}
-                    onClick={() => navigate('/hacker')}
-                  >
-                    View Hacker Demo →
+                  <Button variant="outline" size="lg" className="w-full" onClick={() => navigate('/hacker')}>
+                    View Security Demo
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
-  // ── RENDER: CAPTURE ──────────────────────────────────────────────────────
-  return (
-    <div style={{ backgroundColor: '#F4F6F9', minHeight: '100vh' }}>
-      <IOBHeader />
-      <div className="px-6 py-6">
-        <div className="max-w-5xl mx-auto grid grid-cols-[55%_45%] gap-6">
-          {/* LEFT COLUMN */}
-          <div>
-            {/* Instruction */}
-            <div className="mb-3">
-              <p
-                className="text-xl font-bold transition-all duration-500"
-                style={{ color: '#C8102E' }}
-              >
-                {STEPS[stepIndex]?.instruction}
-              </p>
-            </div>
+  const completedCount = completedSteps.filter(Boolean).length
 
-            {/* Video */}
-            <div
-              className="relative rounded-xl overflow-hidden"
-              style={{ border: '3px solid #003087' }}
-            >
+  return (
+    <PageShell backTo="/" backLabel="Home">
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#d5e2fc] bg-white/70 px-4 py-3 backdrop-blur-sm">
+          <div>
+            <p className="text-xs uppercase tracking-[0.14em] text-[#6a84af]">Enrollment in progress</p>
+            <p className="text-sm font-medium text-[#214b95]">{STEPS[stepIndex].instruction}</p>
+          </div>
+          <Badge className="bg-[#e6efff] text-[#0e3e92] hover:bg-[#dce8ff]">
+            Step {stepIndex + 1} of {STEPS.length}
+          </Badge>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[1.28fr_0.72fr]">
+          <motion.section className="premium-card overflow-hidden p-4" {...fadeInUp}>
+            <div className="relative overflow-hidden rounded-2xl border border-[#cfddf8] bg-[#d7e6ff]">
               <video
                 ref={vidlive.videoRef}
                 autoPlay
                 playsInline
                 muted
-                style={{ width: '100%', height: 'auto', display: 'block', transform: 'scaleX(-1)' }}
+                className="aspect-video w-full object-cover"
+                style={{ transform: 'scaleX(-1)' }}
               />
               <canvas
                 ref={vidlive.canvasRef}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'none',
-                  transform: 'scaleX(-1)',
-                }}
+                className="absolute inset-0 h-full w-full pointer-events-none"
+                style={{ transform: 'scaleX(-1)' }}
               />
-            </div>
-
-            {/* Countdown bar */}
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Step {stepIndex + 1} of {STEPS.length}</span>
-                <span>{Math.round(countdown)}%</span>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#E5E7EB' }}>
-                <div
-                  className="h-full rounded-full transition-all duration-100"
-                  style={{ width: `${countdown}%`, backgroundColor: '#C8102E' }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div>
-            <Card className="shadow-lg border-0">
-              <CardContent className="pt-6">
-                <h3 className="font-bold text-gray-800 mb-4">Enrollment Progress</h3>
-
-                <div className="space-y-3 mb-6">
-                  {STEPS.map((step, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all"
-                        style={{
-                          backgroundColor: completedSteps[i]
-                            ? '#16A34A'
-                            : i === stepIndex
-                            ? '#003087'
-                            : '#E5E7EB',
-                          color: completedSteps[i] || i === stepIndex ? 'white' : '#6B7280',
-                          border: i === stepIndex && !completedSteps[i] ? '2px solid #C8102E' : 'none',
-                        }}
-                      >
-                        {completedSteps[i] ? '✓' : i + 1}
-                      </div>
-                      <span
-                        className="text-sm"
-                        style={{
-                          fontWeight: i === stepIndex ? 600 : 400,
-                          color: completedSteps[i] ? '#16A34A' : i === stepIndex ? '#003087' : '#9CA3AF',
-                        }}
-                      >
-                        {step.label}
-                      </span>
-                    </div>
-                  ))}
+              <div className="pointer-events-none absolute inset-5 rounded-[1.5rem] border-2 border-white/70 shadow-[inset_0_0_0_1px_rgba(15,62,146,0.15)]" />
+              {vidlive.landmarksDetected === 0 && (
+                <div className="absolute inset-0 grid place-items-center bg-[#0f3e92]/50 p-4 text-center text-sm font-medium text-white">
+                  Position your face inside the frame to continue secure enrollment.
                 </div>
+              )}
+            </div>
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-[0.12em] text-[#5e79a3]">
+                <span>Step progress</span>
+                <span>{countdown}%</span>
+              </div>
+              <Progress value={countdown} className="h-2.5 bg-[#e6efff]" />
+            </div>
+          </motion.section>
 
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Live Metrics
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Landmarks</span>
-                      <span
-                        className="text-sm font-semibold"
-                        style={{ color: vidlive.landmarksDetected >= 400 ? '#16A34A' : '#D97706' }}
+          <motion.section className="space-y-4" {...fadeInUp}>
+            <Card className="premium-card">
+              <CardContent className="pt-5 pb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6884b2]">
+                  Verification checklist
+                </p>
+                <div className="mt-4 space-y-3">
+                  {STEPS.map((step, index) => {
+                    const isCurrent = index === stepIndex
+                    const isComplete = completedSteps[index]
+                    return (
+                      <motion.div
+                        key={step.label}
+                        className="flex items-center gap-3 rounded-xl border border-[#d8e4fb] bg-[#f7faff] px-3 py-2"
+                        {...hoverLift}
                       >
-                        {vidlive.landmarksDetected} / 468
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Frame Quality</span>
-                      <Badge
-                        className="text-xs"
-                        style={{
-                          backgroundColor:
-                            vidlive.preprocessGrade === 'good'
-                              ? '#16A34A'
-                              : vidlive.preprocessGrade === 'marginal'
-                              ? '#D97706'
-                              : '#DC2626',
-                          color: 'white',
-                          border: 'none',
-                        }}
-                      >
-                        {vidlive.preprocessGrade.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Jitter Score</span>
-                      <span className="text-sm font-semibold text-gray-700">
-                        {vidlive.jitterScoreVal} / 100
-                      </span>
-                    </div>
-                  </div>
+                        <div
+                          className={`grid h-8 w-8 place-items-center rounded-full text-xs font-semibold ${
+                            isComplete
+                              ? 'bg-emerald-600 text-white'
+                              : isCurrent
+                              ? 'bg-[#0f3e92] text-white'
+                              : 'bg-[#e8efff] text-[#4f6d9d]'
+                          }`}
+                        >
+                          {isComplete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                        </div>
+                        <div>
+                          <p className={`text-sm font-medium ${isCurrent ? 'text-[#173f8b]' : 'text-[#54709f]'}`}>
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-[#6a84af]">{step.instruction}</p>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
-          </div>
+
+            <Card className="premium-card">
+              <CardContent className="space-y-3 pt-5 pb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6884b2]">Live quality status</p>
+                <div className="security-kpi flex items-center justify-between text-sm">
+                  <span className="text-[#5e79a3]">Face tracking</span>
+                  <span className="font-semibold text-[#194693]">{vidlive.landmarksDetected} / 468</span>
+                </div>
+                <div className="security-kpi flex items-center justify-between text-sm">
+                  <span className="text-[#5e79a3]">Frame quality</span>
+                  <Badge
+                    className={`${
+                      vidlive.preprocessGrade === 'good'
+                        ? 'bg-emerald-600'
+                        : vidlive.preprocessGrade === 'marginal'
+                        ? 'bg-amber-600'
+                        : 'bg-rose-600'
+                    } text-white`}
+                  >
+                    {vidlive.preprocessGrade}
+                  </Badge>
+                </div>
+                <div className="security-kpi flex items-center justify-between text-sm">
+                  <span className="text-[#5e79a3]">Completion</span>
+                  <span className="font-semibold text-[#194693]">{completedCount} / {STEPS.length}</span>
+                </div>
+                {vidlive.error && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {vidlive.error}
+                  </div>
+                )}
+                {!vidlive.error && (
+                  <div className="flex items-center gap-2 text-sm text-[#617ca8]">
+                    <LoaderCircle className="h-4 w-4 animate-spin text-[#0f3e92]" />
+                    Secure baseline analysis running...
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.section>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }
