@@ -19,11 +19,11 @@ app = FastAPI(
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
-origins = ["http://localhost:5173"]
-
+# Allow any localhost port so Vite's auto-port-bump (5173 → 5174 etc.) never
+# breaks the preflight.  In production replace this regex with the real domain.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
