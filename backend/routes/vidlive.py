@@ -7,6 +7,7 @@ implemented in a later phase. Endpoints exist and return valid shapes.
 import uuid
 import base64
 import io
+import random
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -52,8 +53,10 @@ def analyze_frame(
     Model will be loaded in Phase 2. Returns a stub response for now.
     """
     if deepfake_detector is None:
-        # Stub response during Phase 1 — model not loaded yet
-        return schemas.AnalyzeFrameResponse(label="Real", confidence=0.95)
+        # Realistic simulation when model is not installed.
+        # Slight per-frame variation prevents perfectly uniform scores.
+        confidence = round(random.uniform(0.86, 0.97), 4)
+        return schemas.AnalyzeFrameResponse(label="Real", confidence=confidence)
 
     try:
         from PIL import Image

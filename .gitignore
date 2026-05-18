@@ -26,7 +26,7 @@ node_modules/
 **/node_modules/
 
 # Vite build output
-vidlive/frontend/dist/
+frontend/dist/
 
 # IDE / OS
 .vscode/
@@ -38,5 +38,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# ONNX model files (large — downloaded automatically at runtime)
+*.onnx
+
 # HuggingFace model cache (large — download on first run)
 .cache/
+.huggingface/

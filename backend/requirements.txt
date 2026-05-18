@@ -22,7 +22,10 @@ pydantic>=2.5.3
 pillow>=10.2.0
 numpy>=1.26.3
 
-# Deepfake detection model (large download — ~2.5 GB total)
-# Install separately: pip install transformers torch
-# transformers>=4.37.0
-# torch>=2.1.0
+# Deepfake detection — CPU-only, no CUDA / PyTorch / TensorFlow required
+# onnxruntime : ~35 MB wheel, installs in seconds on Windows/Linux/Mac.
+# huggingface_hub : downloads the ONNX model file (~85 MB) on first run
+#                   and caches it in %USERPROFILE%\.cache\huggingface\.
+# Model: prithivMLmods/Deepfake-Detection-Exp-02-22-ONNX (INT8 ViT-B/32)
+onnxruntime>=1.17.0
+huggingface_hub>=0.20.0

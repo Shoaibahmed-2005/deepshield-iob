@@ -12,7 +12,7 @@
 | Database | PostgreSQL (`vidlive_db`) |
 | Auth | JWT (24h) + bcrypt 4.0.1 |
 | Face Detection | MediaPipe FaceMesh (CDN, browser) |
-| Deepfake Detection | HuggingFace `dima806/deepfake_vs_real_image_detection` |
+| Deepfake Detection | HuggingFace `prithivMLmods/Deepfake-Detection-Exp-02-22-ONNX` (ONNX, CPU-only) |
 | OTP | Printed to backend terminal (simulated SMS) |
 
 ---
@@ -45,19 +45,18 @@ source venv/bin/activate
 ### Step 2 — Install backend dependencies
 
 ```bash
-cd vidlive/backend
+cd backend
 pip install -r requirements.txt
 ```
 
-> **Note:** On first run, install torch separately if you need deepfake detection:
-> `pip install torch transformers`
-> The HuggingFace model (~400 MB) downloads automatically on first backend start.
+> **Note:** The ONNX deepfake model (~80 MB) downloads automatically on first backend start.
+> No GPU, CUDA, or PyTorch required — runs on CPU via `onnxruntime`.
 
 ---
 
 ### Step 3 — Configure database password
 
-Open `vidlive/backend/.env` and set your PostgreSQL password:
+Open `backend/.env` and set your PostgreSQL password:
 
 ```
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/vidlive_db
@@ -77,7 +76,7 @@ CREATE DATABASE vidlive_db;
 ### Step 4 — Seed the database
 
 ```bash
-# From vidlive/backend/
+# From backend/
 python seed.py
 ```
 
@@ -88,7 +87,7 @@ Safe to run multiple times — skips already-seeded data.
 ### Step 5 — Start the backend
 
 ```bash
-# From vidlive/backend/
+# From backend/
 uvicorn main:app --reload
 ```
 
@@ -108,7 +107,7 @@ OTP for IOB2024001: 482931
 ### Step 6 — Start the frontend (new terminal)
 
 ```bash
-cd vidlive/frontend
+cd frontend
 npm install
 npm run dev
 ```
@@ -187,9 +186,9 @@ http://localhost:5173
 ## Project Structure
 
 ```
-vidlive/
+IOB-ORVIX/
   backend/
-    main.py              FastAPI app entry — CORS, router registration
+    main.py              FastAPI app entry — CORS, router registration, ONNX model load
     database.py          SQLAlchemy engine + session factory
     models.py            Customer, Transaction, VidLiveSession ORM models
     schemas.py           Pydantic request/response schemas
@@ -216,9 +215,9 @@ vidlive/
         OTP.jsx          6-box OTP input with auto-advance
         Dashboard.jsx    Account summary, transactions, quick actions
         Transfer.jsx     Fund transfer form with VID-LIVE trigger
-        VidLive.jsx      6-step liveness verification (Phase 3 — webcam logic)
+        VidLive.jsx      6-step liveness verification (webcam + MediaPipe + ONNX)
         Result.jsx       Trust score circle, breakdown, audit trail
-        Enroll.jsx       Face enrollment flow (Phase 3 — webcam logic)
+        Enroll.jsx       Face enrollment flow (webcam + biometric baseline)
       components/
         Header.jsx       IOB header with gold accent line
         Sidebar.jsx      Customer avatar, nav, enrollment badge
@@ -235,7 +234,7 @@ vidlive/
 |-------|--------|-------------|
 | Phase 1 | Complete | Project structure, all pages/routes scaffolded |
 | Phase 2 | Complete | Full auth flow, transactions, DB integration, all APIs verified |
-| Phase 3 | Pending | VID-LIVE webcam logic — MediaPipe + deepfake model |
+| Phase 3 | Complete | VID-LIVE webcam logic — MediaPipe FaceMesh + ONNX deepfake model |
 
 ---
 
@@ -244,7 +243,8 @@ vidlive/
 - **OTP** is printed to the backend terminal (simulates SMS delivery)
 - **bcrypt** must be pinned to `4.0.1` — passlib 1.7.4 is incompatible with bcrypt >= 4.1
 - **Python 3.14** users: `datetime.utcnow()` is replaced with `datetime.now(timezone.utc)` throughout
-- **Windows console**: ₹ symbol renders fine in browsers and JSON; avoid printing it to cmd/PowerShell
+- **Windows console**: Rs. symbol used in messages instead of ₹ to avoid encoding issues
+- **ONNX model**: Downloads automatically from HuggingFace Hub on first backend start; no GPU required
 
 ---
 
