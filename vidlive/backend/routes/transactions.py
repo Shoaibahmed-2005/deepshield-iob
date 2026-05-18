@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
 def _make_txn_id() -> str:
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     suffix = str(uuid.uuid4().int)[:4]
     return f"TXN{ts}{suffix}"
 
@@ -102,7 +102,7 @@ def transfer(
             vidlive_required=False,
             success=True,
             transaction_id=txn_id,
-            message=f"₹{payload.amount:,.2f} transferred successfully to {receiver.full_name}.",
+            message=f"Rs. {payload.amount:,.2f} transferred successfully to {receiver.full_name}.",
         )
 
 

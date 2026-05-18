@@ -10,27 +10,27 @@
 | Frontend | React 18 (Vite) — port 5173 |
 | Backend | Python FastAPI — port 8000 |
 | Database | PostgreSQL (`vidlive_db`) |
-| Auth | JWT tokens + bcrypt |
-| Face Detection | MediaPipe FaceMesh (CDN, browser-side) |
+| Auth | JWT (24h) + bcrypt 4.0.1 |
+| Face Detection | MediaPipe FaceMesh (CDN, browser) |
 | Deepfake Detection | HuggingFace `dima806/deepfake_vs_real_image_detection` |
-| OTP | Printed to terminal (simulated SMS) |
+| OTP | Printed to backend terminal (simulated SMS) |
 
 ---
 
-## How to Run
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.10+ (tested on 3.14)
 - Node.js 18+
 - PostgreSQL running locally with a database named `vidlive_db`
 
 ---
 
-### Step 1 — Create & activate virtual environment
+### Step 1 — Create and activate virtual environment
 
 ```bash
-# From project root (IOB-ORVIX)
+# From project root (IOB-ORVIX/)
 python -m venv venv
 
 # Windows
@@ -49,20 +49,24 @@ cd vidlive/backend
 pip install -r requirements.txt
 ```
 
-> **Note:** First `pip install` will download PyTorch (~2 GB). Allow time for this.
-> The HuggingFace deepfake model (~400 MB) downloads automatically on first backend start.
+> **Note:** On first run, install torch separately if you need deepfake detection:
+> `pip install torch transformers`
+> The HuggingFace model (~400 MB) downloads automatically on first backend start.
 
 ---
 
 ### Step 3 — Configure database password
 
-Open `vidlive/backend/.env` and replace `PASSWORD` with your PostgreSQL password:
+Open `vidlive/backend/.env` and set your PostgreSQL password:
 
 ```
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/vidlive_db
+SECRET_KEY=iob-vidlive-secret-key-2024
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_HOURS=24
 ```
 
-Make sure `vidlive_db` database exists:
+Create the database if it doesn't exist:
 
 ```sql
 CREATE DATABASE vidlive_db;
@@ -70,14 +74,14 @@ CREATE DATABASE vidlive_db;
 
 ---
 
-### Step 4 — Run database seed
+### Step 4 — Seed the database
 
 ```bash
 # From vidlive/backend/
 python seed.py
 ```
 
-This creates all tables and inserts 3 test customers + 6 historical transactions.
+Safe to run multiple times — skips already-seeded data.
 
 ---
 
@@ -88,8 +92,16 @@ This creates all tables and inserts 3 test customers + 6 historical transactions
 uvicorn main:app --reload
 ```
 
-Backend starts at: http://localhost:8000  
-API docs at: http://localhost:8000/docs
+Backend: http://localhost:8000  
+API docs: http://localhost:8000/docs
+
+The OTP for each login will print to **this terminal**:
+
+```
+========================================
+OTP for IOB2024001: 482931
+========================================
+```
 
 ---
 
@@ -101,13 +113,7 @@ npm install
 npm run dev
 ```
 
-Frontend starts at: http://localhost:5173
-
----
-
-### Step 7 — Open the app
-
-Visit: **http://localhost:5173**
+Frontend: http://localhost:5173
 
 ---
 
@@ -115,112 +121,131 @@ Visit: **http://localhost:5173**
 
 | Customer ID | Password | Name | Balance |
 |------------|----------|------|---------|
-| IOB2024001 | Arjun@123 | Arjun Mehta | ₹2,50,000 |
-| IOB2024002 | Rajesh@123 | Rajesh Venkataraman | ₹25,00,000 |
-| IOB2024003 | Priya@123 | Priya Sundaram | ₹85,000 |
+| IOB2024001 | Arjun@123 | Arjun Mehta | Rs. 2,50,000 |
+| IOB2024002 | Rajesh@123 | Rajesh Venkataraman | Rs. 25,00,000 |
+| IOB2024003 | Priya@123 | Priya Sundaram | Rs. 85,000 |
 
-**Receiver account for testing transfers:** `0057100000030003` (Priya Sundaram)
+**Receiver account for testing:** `0057100000030003` (Priya Sundaram)
 
 ---
 
-## User Flow
+## Demo Flow
 
 ```
+http://localhost:5173
+
 / (Landing)
-  → /login (Customer ID + Password)
-    → /otp  (OTP printed in backend terminal)
-      → /dashboard
-          ├── /transfer  (amount < ₹50,000 → instant)
-          │   └── (amount ≥ ₹50,000) → /vidlive → /result
-          └── /enroll  (VID-LIVE face enrollment)
+  → /login        Enter Customer ID + Password
+    → /otp         Enter OTP from backend terminal
+      → /dashboard  View balance, recent transactions
+          ├── /transfer    Amount < Rs.50,000  → instant transfer
+          │              Amount >= Rs.50,000  → /vidlive → /result
+          └── /enroll      One-time face enrollment (VID-LIVE)
 ```
 
 ---
 
-## Demo Scenario
+## API Routes
 
-1. Login as **IOB2024001** (Arjun Mehta)
-2. OTP appears in the **backend terminal** — enter it
-3. Dashboard shows account balance and recent transactions
-4. Click **Fund Transfer** → enter Priya's account `0057100000030003`
-5. Enter amount **≥ ₹50,000** → gold warning banner appears
-6. Click Proceed → VID-LIVE verification page opens
-7. Allow camera → click **Start VID-LIVE Verification**
-8. Watch the 6-step pipeline run in real time
-9. View result page with trust score and breakdown
+### Auth
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/auth/login` | No | Login with Customer ID + Password, triggers OTP |
+| POST | `/auth/verify-otp` | No | Verify OTP, returns JWT |
+| GET | `/auth/me` | JWT | Get current customer profile |
 
----
+### Transactions
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/transactions/transfer` | JWT | Transfer funds. >= Rs.50,000 requires VID-LIVE |
+| GET | `/transactions/history` | JWT | Last 10 transactions |
 
-## OTP Note
-
-During demo, OTP is printed to the **backend terminal**:
-
-```
-========================================
-OTP for IOB2024001: 482931
-========================================
-```
-
----
-
-## Architecture
-
-```
-vidlive/
-  backend/
-    main.py          ← FastAPI app, CORS, router registration
-    database.py      ← SQLAlchemy engine, session factory
-    models.py        ← Customer, Transaction, VidLiveSession ORM models
-    schemas.py       ← Pydantic request/response schemas
-    auth.py          ← JWT creation/verification, bcrypt, get_current_customer
-    seed.py          ← Database seeder (run once)
-    requirements.txt
-    .env             ← DATABASE_URL, SECRET_KEY
-    routes/
-      auth.py        ← /auth/login, /auth/verify-otp, /auth/me
-      transactions.py← /transactions/transfer, /transactions/history
-      vidlive.py     ← /vidlive/start, /vidlive/analyze-frame,
-                       /vidlive/submit-scores, /vidlive/enroll-face
-
-  frontend/
-    index.html       ← CSS variables, MediaPipe CDN scripts, Google Fonts
-    vite.config.js
-    package.json
-    src/
-      main.jsx       ← React entry point
-      App.jsx        ← BrowserRouter, AuthContext, TxnContext, routes
-      api.js         ← Axios instance, JWT interceptor, all API functions
-      pages/
-        Landing.jsx  ← IOB-styled landing page
-        Login.jsx    ← Customer ID + Password login
-        OTP.jsx      ← 6-box OTP input with auto-advance
-        Dashboard.jsx← Account summary, transactions, quick actions
-        Transfer.jsx ← Fund transfer form with VID-LIVE trigger
-        VidLive.jsx  ← 6-step liveness verification (Phase 2 full logic)
-        Result.jsx   ← Trust score circle, breakdown, forensic details
-        Enroll.jsx   ← Face enrollment flow
-      components/
-        Header.jsx        ← IOB header with gold accent line
-        Sidebar.jsx       ← Customer avatar, nav, enrollment badge
-        TransactionCard.jsx← Table row for a single transaction
-        StepCard.jsx       ← VID-LIVE step card with score bar
-        TrustMeter.jsx     ← Animated canvas trust score circle
-```
+### VID-LIVE
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/vidlive/start` | JWT | Start a VID-LIVE session |
+| POST | `/vidlive/analyze-frame` | JWT | Analyze a base64 frame for deepfake |
+| POST | `/vidlive/submit-scores` | JWT | Submit all step scores, compute trust |
+| POST | `/vidlive/enroll-face` | JWT | Store face baseline for enrollment |
 
 ---
 
-## VID-LIVE Trust Score Formula
+## Trust Score Formula
 
-| Step | Check | Max Points |
-|------|-------|-----------|
-| 3 | 3D Geometry (parallax > 0.7 = 15pts) | 15 |
-| 4 | AI Deepfake Detection (avg Real confidence × 35) | 35 |
-| 5 | Reaction Timing (200-400ms = 25pts) | 25 |
-| 6 | Micro-expression naturalness | 25 |
+| Step | Check | Max |
+|------|-------|-----|
+| 3 | 3D Geometry — parallax > 0.7 = 15pts, > 0.4 = 10pts | 15 |
+| 4 | AI Deepfake — avg Real confidence × 35 | 35 |
+| 5 | Reaction Timing — 200-400ms = 25pts, 400-600ms = 15pts | 25 |
+| 6 | Micro-expression naturalness (from frontend) | 25 |
 | **Total** | | **100** |
 
 **Pass threshold: 70 / 100**
 
 ---
 
-© Indian Overseas Bank — VID-LIVE System v1.0
+## Project Structure
+
+```
+vidlive/
+  backend/
+    main.py              FastAPI app entry — CORS, router registration
+    database.py          SQLAlchemy engine + session factory
+    models.py            Customer, Transaction, VidLiveSession ORM models
+    schemas.py           Pydantic request/response schemas
+    auth.py              JWT + bcrypt utilities, get_current_customer dependency
+    seed.py              Idempotent DB seeder (safe to run multiple times)
+    requirements.txt
+    .env                 DATABASE_URL, SECRET_KEY (not committed to Git)
+    routes/
+      auth.py            /auth/* routes + in-memory OTP store
+      transactions.py    /transactions/* routes
+      vidlive.py         /vidlive/* routes + score computation
+
+  frontend/
+    index.html           CSS variables, MediaPipe CDN, Google Fonts
+    vite.config.js
+    package.json
+    src/
+      main.jsx           React entry point
+      App.jsx            Router, AuthContext, TxnContext
+      api.js             Axios + JWT interceptor (token in memory, not localStorage)
+      pages/
+        Landing.jsx      IOB-styled landing page
+        Login.jsx        Customer ID + Password form
+        OTP.jsx          6-box OTP input with auto-advance
+        Dashboard.jsx    Account summary, transactions, quick actions
+        Transfer.jsx     Fund transfer form with VID-LIVE trigger
+        VidLive.jsx      6-step liveness verification (Phase 3 — webcam logic)
+        Result.jsx       Trust score circle, breakdown, audit trail
+        Enroll.jsx       Face enrollment flow (Phase 3 — webcam logic)
+      components/
+        Header.jsx       IOB header with gold accent line
+        Sidebar.jsx      Customer avatar, nav, enrollment badge
+        TransactionCard.jsx  Transaction table row
+        StepCard.jsx     VID-LIVE step card with animated score bar
+        TrustMeter.jsx   Animated canvas trust score circle
+```
+
+---
+
+## Phase Status
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | Complete | Project structure, all pages/routes scaffolded |
+| Phase 2 | Complete | Full auth flow, transactions, DB integration, all APIs verified |
+| Phase 3 | Pending | VID-LIVE webcam logic — MediaPipe + deepfake model |
+
+---
+
+## Known Notes
+
+- **OTP** is printed to the backend terminal (simulates SMS delivery)
+- **bcrypt** must be pinned to `4.0.1` — passlib 1.7.4 is incompatible with bcrypt >= 4.1
+- **Python 3.14** users: `datetime.utcnow()` is replaced with `datetime.now(timezone.utc)` throughout
+- **Windows console**: ₹ symbol renders fine in browsers and JSON; avoid printing it to cmd/PowerShell
+
+---
+
+© Indian Overseas Bank — VID-LIVE System v2.0

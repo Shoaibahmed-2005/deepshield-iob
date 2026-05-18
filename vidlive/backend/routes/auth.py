@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,7 @@ def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
     otp = _generate_otp()
     _otp_store[payload.customer_id] = {
         "otp": otp,
-        "expires_at": datetime.utcnow() + timedelta(minutes=5),
+        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
     }
 
     # Simulate SMS by printing to terminal
@@ -64,7 +64,7 @@ def verify_otp(payload: schemas.OTPVerifyRequest, db: Session = Depends(get_db))
             detail="No OTP found for this Customer ID. Please login again.",
         )
 
-    if datetime.utcnow() > entry["expires_at"]:
+    if datetime.now(timezone.utc) > entry["expires_at"]:
         del _otp_store[payload.customer_id]
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

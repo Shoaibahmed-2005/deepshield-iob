@@ -25,8 +25,8 @@ class Transaction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     transaction_id = Column(String(30), unique=True, index=True, nullable=False)
-    sender_account = Column(String(16), nullable=False)
-    receiver_account = Column(String(16), nullable=False)
+    sender_account = Column(String(30), nullable=False)
+    receiver_account = Column(String(30), nullable=False)
     receiver_name = Column(String(100), nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
     remarks = Column(Text, nullable=True)
