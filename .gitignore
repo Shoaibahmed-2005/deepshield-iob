@@ -1,0 +1,42 @@
+# Environment variables — never commit these
+.env
+*/.env
+**/.env
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Node.js dependencies
+node_modules/
+**/node_modules/
+
+# Vite build output
+vidlive/frontend/dist/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# HuggingFace model cache (large — download on first run)
+.cache/
