@@ -1,26 +1,23 @@
 /**
  * VID-LIVE Enrollment Page — Phase 3 (Full Implementation)
  *
- * Captures a real facial biometric baseline using MediaPipe FaceMesh:
- *   Step 1 — Face Detection       : confirm face present + good lighting
- *   Step 2 — Landmark Capture     : capture 468-point baseline snapshot
- *   Step 3 — 3D Face Mapping      : head-turn yaw baseline
- *   Step 4 — Micro-expression Baseline : landmark variance during hold-still
- *   Step 5 — Reaction Baseline    : EAR blink timing after audio beep
- *
- * On completion calls /vidlive/enroll-face with real captured data and
- * marks the customer's account as VID-LIVE enrolled.
+ * MediaPipe FaceMesh is now loaded via the npm package (@mediapipe/face_mesh).
+ * WASM assets are served locally from /mediapipe/ (public directory).
+ * The Camera helper from @mediapipe/camera_utils manages getUserMedia + the
+ * animation-frame loop so we don't need a manual RAF or stream ref.
  */
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import '@mediapipe/face_mesh'
+import '@mediapipe/camera_utils'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import StepCard from '../components/StepCard'
 import { useAuth } from '../App'
 import { vidliveApi } from '../api'
 
-// ── Geometry helpers (same as VidLive.jsx) ───────────────────────────────────
+// ── Geometry helpers ──────────────────────────────────────────────────────────
 
 function dist2d(a, b) {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
@@ -92,15 +89,14 @@ export default function Enroll() {
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const videoRef       = useRef(null)
-  const streamRef      = useRef(null)
   const faceMeshRef    = useRef(null)
-  const rafIdRef       = useRef(null)
+  const cameraRef      = useRef(null)   // Camera instance — manages stream + RAF
   const abortRef       = useRef(false)
   const onResultsRef   = useRef(null)   // stable callback ref
 
   // Measurement refs
   const phaseRef       = useRef('idle')
-  const baselineLmRef  = useRef(null)   // snapshot of landmarks when looking straight
+  const baselineLmRef  = useRef(null)
   const yawBucketRef   = useRef([])
   const microSnapRef   = useRef([])
   const beepTimeRef    = useRef(null)
@@ -109,9 +105,9 @@ export default function Enroll() {
   const lastUIRef      = useRef(0)
 
   // ── UI State ──────────────────────────────────────────────────────────────
-  const [mpState,     setMpState]     = useState('loading')   // loading|ready|error
+  const [mpState,     setMpState]     = useState('loading')
   const [cameraErr,   setCameraErr]   = useState('')
-  const [phase,       setPhase]       = useState('idle')      // idle|running|done|error
+  const [phase,       setPhase]       = useState('idle')
   const [stepSt,      setStepSt]      = useState(ENROLL_STEPS.map(() => ({ status: 'Pending', score: 0, detail: '' })))
   const [instrIdx,    setInstrIdx]    = useState(0)
   const [timeLeft,    setTimeLeft]    = useState(0)
@@ -142,15 +138,26 @@ export default function Enroll() {
   }
 
   // ── FaceMesh results handler ──────────────────────────────────────────────
+  // Updated on every render via ref so FaceMesh always calls the latest closure.
 
   onResultsRef.current = function handleResults(results) {
     const now = Date.now()
     const lms = results.multiFaceLandmarks?.[0]
 
+    // Throttle React state updates + console logs to ~8 fps
     if (now - lastUIRef.current > 125) {
       lastUIRef.current = now
+      console.log(
+        '[Enroll] onResults | face:', !!lms,
+        '| landmarks:', lms?.length ?? 0,
+        '| phase:', phaseRef.current,
+      )
       setFaceVisible(!!lms)
-      setFrameCount(c => c + 1)
+      setFrameCount(c => {
+        const next = c + 1
+        if (next % 30 === 0) console.log('[Enroll] Frames processed:', next)
+        return next
+      })
     }
     if (!lms) return
 
@@ -163,6 +170,7 @@ export default function Enroll() {
         const p = lms[i]; snap.push({ x: p?.x ?? 0, y: p?.y ?? 0, z: p?.z ?? 0 })
       }
       baselineLmRef.current = snap
+      console.log('[Enroll] Baseline landmarks captured')
     }
 
     // Step 3: collect yaw samples
@@ -188,6 +196,7 @@ export default function Enroll() {
       if (ear < 0.20) {
         blinkRef.current = true
         reactionMsRef.current = Date.now() - beepTimeRef.current
+        console.log('[Enroll] Blink detected! EAR:', ear.toFixed(3), '| RT:', reactionMsRef.current, 'ms')
       }
     }
   }
@@ -195,44 +204,73 @@ export default function Enroll() {
   // ── MediaPipe initialisation ──────────────────────────────────────────────
 
   async function initMediaPipe() {
-    if (typeof window.FaceMesh === 'undefined') {
-      setMpState('error')
-      setCameraErr('MediaPipe FaceMesh not loaded. Check your internet connection and reload.')
-      return
-    }
+    // Reset abort so the Camera loop doesn't exit immediately when React Strict
+    // Mode re-invokes this effect after the cleanup of the first run.
+    abortRef.current = false
+    console.log('[Enroll] initMediaPipe: start')
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' }, audio: false,
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await new Promise(res => {
-          videoRef.current.onloadeddata = res
-          videoRef.current.onerror = res
-        })
-      }
-      const fm = new window.FaceMesh({
-        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
+      // FaceMesh from npm — WASM assets served locally from /mediapipe/
+      const { FaceMesh, Camera } = globalThis
+      if (!FaceMesh || !Camera) throw new Error('MediaPipe runtime did not load')
+
+      const fm = new FaceMesh({
+        locateFile: (file) => `/mediapipe/${file}`,
       })
       fm.setOptions({
-        maxNumFaces: 1, refineLandmarks: true,
-        minDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
+        maxNumFaces:            1,
+        refineLandmarks:        true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence:  0.5,
       })
-      fm.onResults(r => onResultsRef.current(r))
+      // Stable wrapper: FaceMesh registers the handler once but always calls
+      // the latest closure through the ref.
+      fm.onResults((r) => onResultsRef.current(r))
+
+      console.log('[Enroll] Initialising FaceMesh WASM (served from /mediapipe/)…')
       await fm.initialize()
+      console.log('[Enroll] FaceMesh WASM ready')
+
+      // If cleanup ran during the WASM download, bail cleanly.
+      if (abortRef.current) {
+        fm.close()
+        console.log('[Enroll] Aborted during FaceMesh init')
+        return
+      }
+
       faceMeshRef.current = fm
 
-      const loop = async () => {
-        if (abortRef.current) return
-        if (faceMeshRef.current && videoRef.current?.readyState >= 2) {
-          try { await faceMeshRef.current.send({ image: videoRef.current }) } catch { }
-        }
-        rafIdRef.current = requestAnimationFrame(loop)
+      // Camera from @mediapipe/camera_utils — handles getUserMedia, srcObject,
+      // and the animation-frame loop internally.
+      const cam = new Camera(videoRef.current, {
+        onFrame: async () => {
+          if (faceMeshRef.current && !abortRef.current) {
+            try {
+              await faceMeshRef.current.send({ image: videoRef.current })
+            } catch (e) {
+              console.warn('[Enroll] send() error:', e)
+            }
+          }
+        },
+        width:  640,
+        height: 480,
+      })
+      cameraRef.current = cam
+
+      console.log('[Enroll] Starting Camera…')
+      await cam.start()
+
+      if (abortRef.current) {
+        cam.stop()
+        fm.close()
+        console.log('[Enroll] Aborted after camera start')
+        return
       }
-      rafIdRef.current = requestAnimationFrame(loop)
+
+      console.log('[Enroll] Camera running — frames incoming')
       setMpState('ready')
     } catch (err) {
+      console.error('[Enroll] initMediaPipe error:', err)
       setMpState('error')
       setCameraErr(
         err.name === 'NotAllowedError'
@@ -243,10 +281,12 @@ export default function Enroll() {
   }
 
   function cleanup() {
+    console.log('[Enroll] cleanup: stopping camera and FaceMesh')
     abortRef.current = true
-    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current)
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
-    faceMeshRef.current?.close?.()
+    cameraRef.current?.stop()
+    faceMeshRef.current?.close()
+    cameraRef.current  = null
+    faceMeshRef.current = null
   }
 
   // ── Enrollment sequence ───────────────────────────────────────────────────
@@ -254,13 +294,13 @@ export default function Enroll() {
   async function runEnrollment() {
     if (phase !== 'idle' || mpState !== 'ready') return
 
-    abortRef.current    = false
-    phaseRef.current    = 'idle'
+    abortRef.current      = false
+    phaseRef.current      = 'idle'
     baselineLmRef.current = null
-    yawBucketRef.current = []
-    microSnapRef.current = []
-    beepTimeRef.current  = null
-    blinkRef.current     = false
+    yawBucketRef.current  = []
+    microSnapRef.current  = []
+    beepTimeRef.current   = null
+    blinkRef.current      = false
     reactionMsRef.current = 0
     setStepSt(ENROLL_STEPS.map(() => ({ status: 'Pending', score: 0, detail: '' })))
     setEarDisplay(null)
@@ -280,7 +320,7 @@ export default function Enroll() {
     // ─ Step 1: Face Detection ────────────────────────────────────────────
     setInstrIdx(0)
     updateStep(0, { status: 'Running', score: 0, detail: 'Detecting face and checking lighting…' })
-    phaseRef.current = 'baseline'   // start capturing landmarks
+    phaseRef.current = 'baseline'
     await countdown(INSTRUCTIONS[0].duration)
 
     const gotFace = !!baselineLmRef.current
@@ -295,12 +335,9 @@ export default function Enroll() {
     setInstrIdx(0)
     updateStep(1, { status: 'Running', score: 0, detail: 'Capturing 468 facial landmarks…' })
     await delay(800)
-    updateStep(1, {
-      status: 'Pass', score: 20,
-      detail: `468 landmarks captured — baseline snapshot stored`,
-    })
+    updateStep(1, { status: 'Pass', score: 20, detail: '468 landmarks captured — baseline snapshot stored' })
 
-    // ─ Step 3: 3D Face Mapping — Turn LEFT then RIGHT ────────────────────
+    // ─ Step 3: 3D Face Mapping ───────────────────────────────────────────
     setInstrIdx(1)
     phaseRef.current = 'geometry'
     updateStep(2, { status: 'Running', score: 0, detail: 'Building 3D map — turn head LEFT…' })
@@ -313,19 +350,18 @@ export default function Enroll() {
     phaseRef.current = 'idle'
     const yaws    = yawBucketRef.current
     const maxYaw  = yaws.length > 0 ? Math.max(...yaws) : 0
-    const yawGood = maxYaw > 0.08  // sufficient rotation detected
+    const yawGood = maxYaw > 0.08
     updateStep(2, {
       status: yawGood ? 'Pass' : 'Fail',
       score:  yawGood ? 20 : 10,
       detail: `3D depth baseline set — yaw range ${maxYaw.toFixed(3)} across ${yaws.length} frames`,
     })
 
-    // ─ Step 4: Micro-expression Baseline — HOLD STILL ────────────────────
+    // ─ Step 4: Micro-expression Baseline ─────────────────────────────────
     setInstrIdx(3)
     phaseRef.current = 'micro'
     updateStep(3, { status: 'Running', score: 0, detail: 'Recording involuntary micro-movement baseline…' })
 
-    // Play beep partway through to also get reaction baseline
     const beepOffset = 2500 + Math.random() * 2000
     const beepTimer  = setTimeout(() => {
       if (abortRef.current) return
@@ -338,7 +374,6 @@ export default function Enroll() {
     await countdown(INSTRUCTIONS[3].duration)
     clearTimeout(beepTimer)
 
-    // Extra window for blink if beep fired
     if (beepTimeRef.current && !blinkRef.current) {
       phaseRef.current = 'blink'
       setInstrIdx(4)
@@ -373,7 +408,7 @@ export default function Enroll() {
       await vidliveApi.enrollFace(
         baselineLmRef.current || [],
         { baseline_variance: variance, frames: microSnapRef.current.length },
-        rt > 0 ? rt : 350   // fallback baseline 350 ms
+        rt > 0 ? rt : 350
       )
       await refreshCustomer()
       cleanup()
@@ -656,9 +691,7 @@ const s = {
   successIcon:     { fontSize: 60 },
   successTitle:    { fontSize: 22, fontWeight: 700, color: 'var(--iob-text)' },
   successDesc:     { fontSize: 15, color: 'var(--iob-muted)', lineHeight: 1.7 },
-  successFeatures: {
-    width: '100%', display: 'flex', flexDirection: 'column', gap: 8,
-  },
+  successFeatures: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   featureRow: {
     backgroundColor: 'var(--iob-blue-light)', border: '1px solid var(--iob-border)',
     borderRadius: 8, padding: '10px 16px', fontSize: 13,

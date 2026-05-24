@@ -10,9 +10,8 @@
       href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
       rel="stylesheet"
     />
-    <!-- MediaPipe — loaded globally so VidLive page can access window.FaceMesh -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <!-- MediaPipe assets are served from /mediapipe/ (copied from node_modules) -->
+    <!-- JS modules imported directly in Enroll.jsx and VidLive.jsx via npm -->
     <style>
       *, *::before, *::after {
         box-sizing: border-box;

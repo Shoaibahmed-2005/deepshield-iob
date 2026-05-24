@@ -17,6 +17,8 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import '@mediapipe/face_mesh'
+import '@mediapipe/camera_utils'
 import Header from '../components/Header'
 import StepCard from '../components/StepCard'
 import { useTxn } from '../App'
@@ -136,9 +138,8 @@ export default function VidLive() {
 
   // ── Camera / MediaPipe refs ──────────────────────────────────────────────
   const videoRef        = useRef(null)
-  const streamRef       = useRef(null)
   const faceMeshRef     = useRef(null)
-  const rafIdRef        = useRef(null)
+  const cameraRef       = useRef(null)     // Camera instance — manages stream + RAF
   const abortRef        = useRef(false)    // set true on unmount / sequence abort
 
   // ── Measurement refs (written by onResults at ~30 fps, read by sequence) ─
@@ -252,29 +253,17 @@ export default function VidLive() {
   // ── MediaPipe initialisation ──────────────────────────────────────────────
 
   async function initMediaPipe() {
-    if (typeof window.FaceMesh === 'undefined') {
-      setMpState('error')
-      setCameraErr('MediaPipe FaceMesh not loaded. Check your internet connection and reload.')
-      return
-    }
-    try {
-      // Start camera stream
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' },
-        audio: false,
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await new Promise(res => {
-          videoRef.current.onloadeddata = res
-          videoRef.current.onerror = res   // don't hang forever on error
-        })
-      }
+    // Reset abort so Camera loop doesn't exit immediately when React Strict Mode
+    // re-invokes this effect after the cleanup of the first run.
+    abortRef.current = false
 
-      // Initialise FaceMesh
-      const fm = new window.FaceMesh({
-        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
+    try {
+      // FaceMesh from npm — WASM assets served locally from /mediapipe/
+      const { FaceMesh, Camera } = globalThis
+      if (!FaceMesh || !Camera) throw new Error('MediaPipe runtime did not load')
+
+      const fm = new FaceMesh({
+        locateFile: (file) => `/mediapipe/${file}`,
       })
       fm.setOptions({
         maxNumFaces:            1,
@@ -282,22 +271,33 @@ export default function VidLive() {
         minDetectionConfidence: 0.5,
         minTrackingConfidence:  0.5,
       })
-      // Register via stable wrapper so we always call the latest closure
-      fm.onResults(r => onResultsRef.current(r))
+      // Stable wrapper: registered once but always calls the latest closure.
+      fm.onResults((r) => onResultsRef.current(r))
       await fm.initialize()
+
+      if (abortRef.current) { fm.close(); return }
+
       faceMeshRef.current = fm
 
-      // RAF loop — feeds video frames to FaceMesh
-      const loop = async () => {
-        if (abortRef.current) return
-        if (faceMeshRef.current && videoRef.current?.readyState >= 2) {
-          try { await faceMeshRef.current.send({ image: videoRef.current }) } catch { /* skip frame */ }
-        }
-        rafIdRef.current = requestAnimationFrame(loop)
-      }
-      rafIdRef.current = requestAnimationFrame(loop)
-      setMpState('ready')
+      // Camera from @mediapipe/camera_utils — handles getUserMedia, srcObject,
+      // and the animation-frame loop internally.
+      const cam = new Camera(videoRef.current, {
+        onFrame: async () => {
+          if (faceMeshRef.current && !abortRef.current) {
+            try {
+              await faceMeshRef.current.send({ image: videoRef.current })
+            } catch { /* skip frame on transient error */ }
+          }
+        },
+        width:  640,
+        height: 480,
+      })
+      cameraRef.current = cam
+      await cam.start()
 
+      if (abortRef.current) { cam.stop(); fm.close(); return }
+
+      setMpState('ready')
     } catch (err) {
       setMpState('error')
       setCameraErr(
@@ -310,10 +310,11 @@ export default function VidLive() {
 
   function cleanup() {
     abortRef.current = true
-    if (rafIdRef.current)   cancelAnimationFrame(rafIdRef.current)
     if (deepfakeTimRef.current) clearInterval(deepfakeTimRef.current)
-    if (streamRef.current)  streamRef.current.getTracks().forEach(t => t.stop())
+    cameraRef.current?.stop()
     faceMeshRef.current?.close?.()
+    cameraRef.current   = null
+    faceMeshRef.current = null
   }
 
   // ── Main verification sequence ────────────────────────────────────────────
